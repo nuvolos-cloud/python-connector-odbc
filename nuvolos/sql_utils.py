@@ -6,7 +6,6 @@ import random
 import string
 import re
 import logging
-import shutil
 from tempfile import TemporaryDirectory
 import pandas._libs.lib as lib
 from pyodbc import ProgrammingError
