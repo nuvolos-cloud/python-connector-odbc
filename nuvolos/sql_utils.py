@@ -10,12 +10,7 @@ from tempfile import TemporaryDirectory
 import pandas._libs.lib as lib
 from pyodbc import ProgrammingError
 
-from typing import (
-    TypeVar,
-    Iterator,
-    Tuple,
-    Sequence
-)
+from typing import TypeVar, Iterator, Tuple, Sequence
 
 from pandas.core.api import (
     DataFrame,
@@ -165,11 +160,7 @@ def _index_name(frame, index, index_label):
             else:
                 return index_label
         # return the used column labels for the index columns
-        if (
-                nlevels == 1
-                and "index" not in frame.columns
-                and frame.index.name is None
-        ):
+        if nlevels == 1 and "index" not in frame.columns and frame.index.name is None:
             return ["index"]
         else:
             return [
@@ -307,11 +298,11 @@ def to_sql(
     if_exists="fail",
     index=True,
     index_label=None,
-    nanoseconds=False
+    nanoseconds=False,
 ):
     """
     Load a DataFrame to the specified table in the database.
-    Creates the table if it doesn't yet exist.
+    Creates the table if it doesn't yet exist, with TEXT/FLOAT/DATE/TIMESTAMP columns as required.
     The name will be case sensitive (quoted) if it contains lowercase or special characters or is a reserved keyword.
     Based on the write_pandas function of snowflake-connector-python:
     https://docs.snowflake.com/en/user-guide/python-connector-api.html#write_pandas
@@ -360,15 +351,16 @@ def to_sql(
                 random.choice(string.ascii_lowercase) for _ in range(5)
             )
             create_stage_sql = (
-                "CREATE TEMPORARY STAGE /* Python:nuvolos.to_sql() */ "
-                '"{stage_name}"'
+                "CREATE TEMPORARY STAGE /* Python:nuvolos.to_sql() */ " '"{stage_name}"'
             ).format(stage_name=stage_name)
             logger.debug("Creating temporary stage with '{}'".format(create_stage_sql))
             cursor.execute(create_stage_sql)
             break
         except ProgrammingError as pe:
             if str(pe).endswith("already exists."):
-                logger.debug(f"Temporary stage {stage_name} already exists, choosing a different name.")
+                logger.debug(
+                    f"Temporary stage {stage_name} already exists, choosing a different name."
+                )
                 continue
             raise
 
@@ -377,7 +369,9 @@ def to_sql(
             chunk_path = os.path.join(tmp_folder, "file{}.txt".format(i))
             # Dump chunk into parquet file
             if nanoseconds:
-                chunk.to_parquet(chunk_path, compression="snappy", index=index, version="2.0")
+                chunk.to_parquet(
+                    chunk_path, compression="snappy", index=index, version="2.0"
+                )
             else:
                 chunk.to_parquet(chunk_path, compression="snappy", index=index)
             # Upload parquet file
@@ -406,13 +400,17 @@ def to_sql(
         if is_index and indices is not None:
             db_columns.append(_quote_name(col_name))
             if col_type.startswith("TIMESTAMP"):
-                parquet_columns.append(f"TO_TIMESTAMP($1:{_quote_name(col_name)}::INT,{scale})")
+                parquet_columns.append(
+                    f"TO_TIMESTAMP($1:{_quote_name(col_name)}::INT,{scale})"
+                )
             else:
                 parquet_columns.append(f"$1:{_quote_name(col_name)}")
         else:
             db_columns.append(_quote_name(col_name))
             if col_type.startswith("TIMESTAMP"):
-                parquet_columns.append(f"TO_TIMESTAMP($1:{_quote_name(col_name)}::INT,{scale})")
+                parquet_columns.append(
+                    f"TO_TIMESTAMP($1:{_quote_name(col_name)}::INT,{scale})"
+                )
             else:
                 parquet_columns.append(f"$1:{_quote_name(col_name)}")
     db_columns = ",".join(db_columns)
