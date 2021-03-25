@@ -6,6 +6,7 @@ import random
 import string
 import re
 import logging
+import shutil
 from tempfile import TemporaryDirectory
 import pandas._libs.lib as lib
 from pyodbc import ProgrammingError
@@ -95,13 +96,13 @@ def _quote_name(name):
      - The name contains a special character,
      - The name is a reserved name.
     :param name: Name to quote.
-    :return: The quoted name in UPPERCASE, if quoting is required.
+    :return: The quoted name, if quoting is required.
     """
     if name.upper() in RESERVED_WORDS:
-        return f'"{name.upper()}"'
+        return f'"{name}"'
     elif not UNQUOTED_RE.match(name):
         name = name.replace('"', "")
-        return f'"{name.upper()}"'
+        return f'"{name}"'
     else:
         return name
 
@@ -215,7 +216,7 @@ def _get_create_table_statement(table, index, frame, database=None, schema=None)
         index=index, frame=frame, dtype_mapper=_get_col_db_type
     )
     col_defs = []
-    for col_name, col_type in column_names_and_types:
+    for col_name, col_type, is_index in column_names_and_types:
         col_defs.append(f"  {_quote_name(col_name)} {col_type}")
     qualified_name = _qualify_name(database, schema, table)
     return (
@@ -226,7 +227,7 @@ def _get_create_table_statement(table, index, frame, database=None, schema=None)
 def _qualify_name(database, schema, table):
     if database is not None and schema is None:
         raise ValueError(
-            f"Schmema is not specified for database [{database}] to create table [{_quote_name(table)}] in."
+            f"Schema is not specified for database [{database}] to create table [{_quote_name(table)}] in."
         )
     qualified_name = _quote_name(table)
     if schema is not None:
@@ -255,7 +256,7 @@ def _ensure_table_exists(
     """
     if database is not None and schema is None:
         raise ValueError(
-            f"Schmema is not specified for database [{database}] to check if table [{_quote_name(table)}] exists."
+            f"Schema is not specified for database [{database}] to check if table [{_quote_name(table)}] exists."
         )
     qualified_name = ""
     if schema is not None:
@@ -307,6 +308,7 @@ def to_sql(
     if_exists="fail",
     index=True,
     index_label=None,
+    nanoseconds=False
 ):
     """
     Load a DataFrame to the specified table in the database.
@@ -325,6 +327,7 @@ def to_sql(
              * append: Insert new values to the existing table.
     :param index: bool, default True: Write DataFrame index as a column. Uses index_label as the column name in the table.
     :param index_label: Column label for index column(s). If None is given (default) and index is True, then the index names are used. A sequence should be given if the DataFrame uses MultiIndex.
+    :param nanoseconds: If True, nanosecond timestamps will be used to upload the data. Limits timestamp range from 1677-09-21 00:12:43.145224192 to 2262-04-11 23:47:16.854775807.
     :return: Returns the COPY INTO command's results to verify ingestion in the form of a tuple of whether all chunks were
         ingested correctly, # of chunks, # of ingested rows, and ingest's output.
     """
@@ -362,10 +365,10 @@ def to_sql(
                 '"{stage_name}"'
             ).format(stage_name=stage_name)
             logger.debug("Creating temporary stage with '{}'".format(create_stage_sql))
-            cursor.execute(create_stage_sql).fetchall()
+            cursor.execute(create_stage_sql)
             break
         except ProgrammingError as pe:
-            if pe.msg.endswith("already exists."):
+            if str(pe).endswith("already exists."):
                 logger.debug(f"Temporary stage {stage_name} already exists, choosing a different name.")
                 continue
             raise
@@ -374,7 +377,10 @@ def to_sql(
         for i, chunk in _chunk_helper(df, 10000000):
             chunk_path = os.path.join(tmp_folder, "file{}.txt".format(i))
             # Dump chunk into parquet file
-            chunk.to_parquet(chunk_path, compression="snappy", index=index)
+            if nanoseconds:
+                chunk.to_parquet(chunk_path, compression="snappy", index=index, version="2.0")
+            else:
+                chunk.to_parquet(chunk_path, compression="snappy", index=index)
             # Upload parquet file
             upload_sql = (
                 "PUT /* Python:nuvolos.to_sql() */ "
@@ -391,13 +397,25 @@ def to_sql(
 
     db_columns = []
     parquet_columns = []
-    if indices is not None:
-        for i, idx_label in enumerate(indices):
-            db_columns.append(_quote_name(idx_label))
-            parquet_columns.append(f"$1:{_quote_name(idx_label)}")
-    for col in df.columns:
-        db_columns.append(_quote_name(col))
-        parquet_columns.append(f"$1:{_quote_name(col)}")
+    column_names_and_types = _get_column_names_and_types(
+        index=indices, frame=df, dtype_mapper=_get_col_db_type
+    )
+    scale = 6
+    if nanoseconds:
+        scale = 9
+    for col_name, col_type, is_index in column_names_and_types:
+        if is_index and indices is not None:
+            db_columns.append(_quote_name(col_name))
+            if col_type.startswith("TIMESTAMP"):
+                parquet_columns.append(f"TO_TIMESTAMP($1:{_quote_name(col_name)}::INT,{scale})")
+            else:
+                parquet_columns.append(f"$1:{_quote_name(col_name)}")
+        else:
+            db_columns.append(_quote_name(col_name))
+            if col_type.startswith("TIMESTAMP"):
+                parquet_columns.append(f"TO_TIMESTAMP($1:{_quote_name(col_name)}::INT,{scale})")
+            else:
+                parquet_columns.append(f"$1:{_quote_name(col_name)}")
     db_columns = ",".join(db_columns)
     parquet_columns = ",".join(parquet_columns)
 
@@ -418,7 +436,7 @@ def to_sql(
         on_error="ABORT_STATEMENT",
     )
     logger.debug("Copying into table with '{}'".format(copy_into_sql))
-    copy_results = cursor.execute(copy_into_sql, _is_internal=True).fetchall()
+    copy_results = cursor.execute(copy_into_sql).fetchall()
     cursor.close()
     return (
         all(e[1] == "LOADED" for e in copy_results),

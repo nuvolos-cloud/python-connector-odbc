@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def readme():
@@ -15,7 +15,9 @@ setup(
     author="Alphacruncher",
     author_email="support@nuvolos.cloud",
     license="MIT",
-    packages=["nuvolos-odbc"],
-    install_requires=["keyring", "pyodbc"],
+    packages=find_packages(),
+    install_requires=["keyring", "pyodbc", "pandas", "pyarrow"],
     zip_safe=False,
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest'],
 )

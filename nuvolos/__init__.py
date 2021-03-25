@@ -6,7 +6,7 @@ import re
 from urllib.parse import quote
 import keyring
 import getpass
-from sql_utils import to_sql
+from .sql_utils import to_sql
 
 logger = logging.getLogger(__name__)
 
