@@ -3,3 +3,5 @@ dist
 nuvolos.egg-info
 .eggs
 __pycache__
+/build/
+/nuvolos_odbc.egg-info/
