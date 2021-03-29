@@ -6,12 +6,13 @@ def readme():
         return f.read()
 
 
+exec(open("nuvolos/version.py").read())
 setup(
     name="nuvolos-odbc",
-    version="0.4.0",
+    version=__version__,
     description="The Nuvolos python library for database connectivity, internal PyODBC-based version",
     long_description=readme(),
-    long_description_content_type = "text/markdown",
+    long_description_content_type="text/markdown",
     url="https://github.com/nuvolos-cloud/python-connector-odbc",
     author="Alphacruncher",
     author_email="support@nuvolos.cloud",
@@ -20,6 +21,6 @@ setup(
     include_package_data=True,
     install_requires=["keyring", "pyodbc", "pandas", "pyarrow"],
     zip_safe=False,
-    setup_requires=['pytest-runner'],
-    tests_require=['pytest'],
+    setup_requires=["pytest-runner"],
+    tests_require=["pytest"],
 )

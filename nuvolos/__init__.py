@@ -242,6 +242,7 @@ def get_connection(*args, **kwargs):
         schemaname = kwargs.get("schemaname")
 
     connection_string = get_connection_string(username, password, dbname, schemaname)
+    pyodbc.lowercase=True
     conn = pyodbc.connect(connection_string)
     conn.setencoding("utf-8")
     conn.setdecoding(pyodbc.SQL_CHAR, encoding="utf-8")

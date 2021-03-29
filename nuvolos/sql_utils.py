@@ -1,21 +1,20 @@
 """
 Utility functions to load Pandas DataFrames to Nuvolos/Snowflake.
 """
+import logging
 import os
 import random
-import string
 import re
-import logging
+import string
 from tempfile import TemporaryDirectory
-import pandas._libs.lib as lib
-from pyodbc import ProgrammingError
-
 from typing import TypeVar, Iterator, Tuple, Sequence
 
+import pandas._libs.lib as lib
 from pandas.core.api import (
     DataFrame,
     Series,
 )
+from pyodbc import ProgrammingError, Connection
 
 logger = logging.getLogger(__name__)
 RESERVED_WORDS = frozenset(
@@ -80,7 +79,7 @@ RESERVED_WORDS = frozenset(
         "INCREMENT",  # Oracle reserved words
     ]
 )
-UNQUOTED_RE = re.compile(r"""^[A-Z_]+[A-Z0-9_\$]*$""")
+UNQUOTED_RE = re.compile(r"""^[a-z_]+[a-z0-9_\$]*$""")
 
 
 def _quote_name(name):
@@ -321,6 +320,10 @@ def to_sql(
     :return: Returns the COPY INTO command's results to verify ingestion in the form of a tuple of whether all chunks were
         ingested correctly, # of chunks, # of ingested rows, and ingest's output.
     """
+    if not isinstance(con, Connection):
+        raise ValueError(f"Provided con object is not an pyodbc.Connection instance.")
+    prev_autocommit = con.autocommit
+    con.autocommit = False
     if if_exists not in ("fail", "replace", "append"):
         raise ValueError(f"'{if_exists}' is not valid for if_exists")
 
@@ -434,7 +437,9 @@ def to_sql(
     )
     logger.debug("Copying into table with '{}'".format(copy_into_sql))
     copy_results = cursor.execute(copy_into_sql).fetchall()
+    con.commit()
     cursor.close()
+    con.autocommit = prev_autocommit
     return (
         all(e[1] == "LOADED" for e in copy_results),
         len(copy_results),
