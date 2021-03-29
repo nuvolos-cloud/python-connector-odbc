@@ -9,7 +9,8 @@ This function is able to load large DataFrames quickly and efficiently, using th
 It is based on the `write_pandas` function of the `snowflake-connector-python` package.
 
 ### Note:
-Lowercase DataFrame column/index names or a lowercase table name will result in a lowercase, case-sensitive table name and column names, which can be queried with quoted identifiers.
+It is recommended to use lowercase DataFrame column and index names.
+Uppercase or mixed-case DataFrame column/index names will result in case-sensitive table name and column names, which can be queried with quoted identifiers.
 
 
 ### Syntax:
@@ -57,12 +58,12 @@ import pandas as pd
 conn = get_connection()
 to_sql(
     df=df,
-    name="quotes_AND_index",
+    name="lowercase_is_best",
     con=conn,
     index=True,
     index_label="seq_num",
     if_exists="replace"
 )
-df_r = pd.read_sql('SELECT * FROM "quotes_AND_index";', con=conn, index_col="seq_num")
+df_r = pd.read_sql('SELECT * FROM lowercase_is_best;', con=conn, index_col="seq_num")
 df_c = df.compare(df_r) # Will be an empty DataFrame, as there are no differences.
 ```
