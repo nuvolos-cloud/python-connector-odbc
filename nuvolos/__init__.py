@@ -6,7 +6,7 @@ import re
 from urllib.parse import quote
 import keyring
 import getpass
-from .sql_utils import to_sql
+from .sql_utils import to_sql, _quote_name
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ def get_connection_string(username=None, password=None, dbname=None, schemaname=
     connection_string = connection_string + params
     masked_connection_string = masked_connection_string + params
     logger.debug("Built ODBC connection string: " + masked_connection_string)
-    return connection_string
+    return connection_string, db_name, schema_name
 
 
 def get_connection(*args, **kwargs):
@@ -241,9 +241,10 @@ def get_connection(*args, **kwargs):
         dbname = kwargs.get("dbname")
         schemaname = kwargs.get("schemaname")
 
-    connection_string = get_connection_string(username, password, dbname, schemaname)
+    connection_string, db_name, schema_name = get_connection_string(username, password, dbname, schemaname)
     pyodbc.lowercase=True
     conn = pyodbc.connect(connection_string)
     conn.setencoding("utf-8")
     conn.setdecoding(pyodbc.SQL_CHAR, encoding="utf-8")
+    conn.execute(f"USE SCHEMA {_quote_name(db_name)}.{_quote_name(schema_name)};")
     return conn
