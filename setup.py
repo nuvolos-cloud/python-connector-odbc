@@ -19,7 +19,7 @@ setup(
     license="MIT",
     packages=find_packages(exclude=("tests",)),
     include_package_data=True,
-    install_requires=["keyring", "pyodbc", "pandas", "pyarrow"],
+    install_requires=["keyring", "pyodbc", "pandas", "pyarrow!=8.0.0"],
     zip_safe=False,
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],

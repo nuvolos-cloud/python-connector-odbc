@@ -373,10 +373,16 @@ def to_sql(
             # Dump chunk into parquet file
             if nanoseconds:
                 chunk.to_parquet(
-                    chunk_path, compression="snappy", index=index, version="2.0"
+                    chunk_path,
+                    engine="pyarrow",
+                    compression="snappy",
+                    index=index,
+                    version="2.6",
                 )
             else:
-                chunk.to_parquet(chunk_path, compression="snappy", index=index)
+                chunk.to_parquet(
+                    chunk_path, engine="pyarrow", compression="snappy", index=index
+                )
             # Upload parquet file
             upload_sql = (
                 "PUT /* Python:nuvolos.to_sql() */ "

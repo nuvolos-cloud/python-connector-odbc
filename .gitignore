@@ -5,3 +5,5 @@ nuvolos.egg-info
 __pycache__
 /build/
 /nuvolos_odbc.egg-info/
+/venv/
+/pyodbc-4.0.32.tar.gz
