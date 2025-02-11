@@ -7,3 +7,5 @@ __pycache__
 /nuvolos_odbc.egg-info/
 /venv/
 /pyodbc-4.0.32.tar.gz
+.DS_Store
+.venv/

@@ -1,7 +1,6 @@
 import os
 import logging
 import pyodbc as pyodbc
-from configparser import ConfigParser
 import re
 from urllib.parse import quote
 import keyring
@@ -32,46 +31,6 @@ def credd_from_env_vars():
         return {"username": username, "snowflake_access_token": password}
 
 
-def credd_from_odbc_ini():
-    credential_filename = os.getenv(
-        "NUVOLOS_CREDENTIAL_FILENAME", os.path.expanduser("~") + "/.odbc.ini"
-    )
-    credential_section = os.getenv("NUVOLOS_CREDENTIAL_SECTION", "nuvolos")
-    # Create engine with credentials
-    cred = ConfigParser(interpolation=None)
-    if not os.path.exists(credential_filename):
-        logger.debug(f"Credentials file {credential_filename} not found")
-        return None
-    cred.read(credential_filename)
-    if not cred.has_section(credential_section):
-        logger.debug(
-            f"Could not find section '{credential_section}' in odbc.ini file {credential_filename}. "
-            f"Please add your Nuvolos Snowflake credentials there "
-            f"(your username as 'uid' and your Snowflake access token as 'pwd')."
-        )
-    try:
-        odbc_ini = dict(cred.items(credential_section))
-    except:
-        odbc_ini = {}
-
-    if "uid" not in odbc_ini:
-        logger.debug(
-            f"Could not find option 'uid' in the '{credential_section}' "
-            f"section of odbc.ini file {credential_filename}. "
-            f"Please set it to your Nuvolos username"
-        )
-        return None
-    if "pwd" not in odbc_ini:
-        logger.debug(
-            f"Could not find option 'pwd' in the '{credential_section}' "
-            f"section of odbc.ini file {credential_filename}. "
-            f"Please set it to your Nuvolos Snowflake access token"
-        )
-        return None
-    logger.debug(f"Found username and snowflake_access_token in {credential_filename}")
-    return {"username": odbc_ini["uid"], "snowflake_access_token": odbc_ini["pwd"]}
-
-
 def credd_from_secrets():
     username_filename = os.getenv("NUVOLOS_USERNAME_FILENAME", "/secrets/username")
     snowflake_access_token_filename = os.getenv(
@@ -89,8 +48,19 @@ def credd_from_secrets():
     ) as access_token:
         username = username.readline()
         password = access_token.readline()
-        logger.debug(f"Found username and Snowflake access token in /secrets files")
+        logger.debug("Found username and Snowflake access token in /secrets files")
         return {"username": username, "snowflake_access_token": password}
+
+
+def username_from_secrets():
+    username_filename = os.getenv("NUVOLOS_USERNAME_FILENAME", "/secrets/username")
+    if not os.path.exists(username_filename):
+        logger.warning(f"Could not find secret file {username_filename}")
+        return None
+    with open(username_filename) as username:
+        username = username.readline()
+        logger.debug("Found username in /secrets file")
+        return username
 
 
 def input_nuvolos_credential():
@@ -121,7 +91,7 @@ def dbpath_from_file(path_filename):
         first_line = lines[0].rstrip()
         if "Tables are not enabled" in first_line:
             raise Exception(
-                f"Tables are not enabled for this space, please enable them first"
+                "Tables are not enabled for this space, please enable them first in the space settings."
             )
         # Split at "." character
         # This should have resulted in two substrings
@@ -151,19 +121,19 @@ def dbpath_from_env_vars():
 
 def get_connection_string(username=None, password=None, dbname=None, schemaname=None):
     if username is None and password is None:
-        credd = (
-            credd_from_secrets()
-            or credd_from_env_vars()
-            or credd_from_odbc_ini()
-            or credd_from_local()
-        )
-        if credd is None:
-            input_nuvolos_credential()
-            credd = credd_from_local()
+        if os.getenv("SNOWFLAKE_RSA_KEY"):
+            username = os.getenv("") or username_from_secrets()
+        else:
+            credd = credd_from_env_vars() or credd_from_secrets() or credd_from_local()
+            if credd is None:
+                input_nuvolos_credential()
+                credd = credd_from_local()
 
-        username = credd["username"]
-        password = credd["snowflake_access_token"]
-    elif username is not None and password is None:
+            username = credd["username"]
+            password = credd["snowflake_access_token"]
+    elif (
+        username is not None and password is None and not os.getenv("SNOWFLAKE_RSA_KEY")
+    ):
         raise ValueError(
             "You have provided a username but not a password. "
             "Please either provide both arguments or leave both arguments empty."
@@ -174,7 +144,7 @@ def get_connection_string(username=None, password=None, dbname=None, schemaname=
             "Please either provide both arguments or leave both arguments empty."
         )
     else:
-        logger.debug(f"Found username and Snowflake access token as input arguments")
+        logger.debug("Found username and Snowflake access token as input arguments")
 
     if dbname is None and schemaname is None:
         path_filename = os.getenv("NUVOLOS_DBPATH_FILE", "/lifecycle/.dbpath")
@@ -205,14 +175,26 @@ def get_connection_string(username=None, password=None, dbname=None, schemaname=
     else:
         db_name = dbname
         schema_name = schemaname
-        logger.debug(f"Found database and schema as input arguments")
+        logger.debug("Found database and schema as input arguments")
 
     default_snowflake_host = (
         "acstg.eu-central-1" if "STAGING/" in db_name else "alphacruncher.eu-central-1"
     )
     snowflake_host = os.getenv("NUVOLOS_SNOWFLAKE_HOST", default_snowflake_host)
-    connection_string = f"DRIVER=SnowflakeDSIIDriver;SERVER={snowflake_host}.snowflakecomputing.com;DATABASE=%22{quote(db_name)}%22;SCHEMA=%22{quote(schema_name)}%22;UID={username};PWD={password}"
-    masked_connection_string = f"DRIVER=SnowflakeDSIIDriver;SERVER={snowflake_host}.snowflakecomputing.com;DATABASE=%22{quote(db_name)}%22;SCHEMA=%22{quote(schema_name)}%22;UID={username};PWD=************"
+    connection_string = f"DRIVER=SnowflakeDSIIDriver;SERVER={snowflake_host}.snowflakecomputing.com;DATABASE=%22{quote(db_name)}%22;SCHEMA=%22{quote(schema_name)}%22;UID={username}"
+    masked_connection_string = f"DRIVER=SnowflakeDSIIDriver;SERVER={snowflake_host}.snowflakecomputing.com;DATABASE=%22{quote(db_name)}%22;SCHEMA=%22{quote(schema_name)}%22;UID={username}"
+
+    if os.getenv("SNOWFLAKE_RSA_KEY"):
+        connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIVATE_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
+        masked_connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIVATE_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
+        if os.getenv("SNOWFLAKE_RSA_KEY_PASSPHRASE"):
+            connection_string += (
+                f";PRIVATE_KEY_FILE_PWD={os.getenv('SNOWFLAKE_RSA_KEY_PASSPHRASE')}"
+            )
+            masked_connection_string += ";PRIVATE_KEY_FILE_PWD=************"
+    else:
+        connection_string += f";PWD={password}"
+        masked_connection_string += ";PWD=************"
 
     params = (
         ";CLIENT_METADATA_REQUEST_USE_CONNECTION_CTX=TRUE"
@@ -230,6 +212,10 @@ def get_connection(*args, **kwargs):
         password = None
         dbname = args[0]
         schemaname = args[1]
+    elif len(args) == 3:
+        username = args[0]
+        dbname = args[1]
+        schemaname = args[2]
     elif len(args) == 4:
         username = args[0]
         password = args[1]

@@ -43,7 +43,7 @@ def to_sql(
              * append: Insert new values to the existing table.
     :param index: bool, default True: Write DataFrame index as a column. Uses index_label as the column name in the table.
     :param index_label: Column label for index column(s). If None is given (default) and index is True, then the index names are used. A sequence should be given if the DataFrame uses MultiIndex.
-    :param nanoseconds: If True, nanosecond timestamps will be used to upload the data. Limits timestamp range from 1677-09-21 00:12:43.145224192 to 2262-04-11 23:47:16.854775807.
+    :param nanoseconds: If True, nanosecond timestamps will be used to upload the data. Limits timestamp range from 1677-09-21 00:12:43.145224192 to 2262-04-11 23:47:16.854775807. 
     :return: Returns the COPY INTO command's results to verify ingestion in the form of a tuple of whether all chunks were
         ingested correctly, # of chunks, # of ingested rows, and ingest's output.
     """

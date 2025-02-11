@@ -321,7 +321,7 @@ def to_sql(
         ingested correctly, # of chunks, # of ingested rows, and ingest's output.
     """
     if not isinstance(con, Connection):
-        raise ValueError(f"Provided con object is not an pyodbc.Connection instance.")
+        raise ValueError("Provided con object is not an pyodbc.Connection instance.")
     prev_autocommit = con.autocommit
     con.autocommit = False
     if if_exists not in ("fail", "replace", "append"):
