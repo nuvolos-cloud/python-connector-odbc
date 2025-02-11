@@ -297,7 +297,6 @@ def to_sql(
     if_exists="fail",
     index=True,
     index_label=None,
-    nanoseconds=False,
 ):
     """
     Load a DataFrame to the specified table in the database.
@@ -316,7 +315,6 @@ def to_sql(
              * append: Insert new values to the existing table.
     :param index: bool, default True: Write DataFrame index as a column. Uses index_label as the column name in the table.
     :param index_label: Column label for index column(s). If None is given (default) and index is True, then the index names are used. A sequence should be given if the DataFrame uses MultiIndex.
-    :param nanoseconds: If True, nanosecond timestamps will be used to upload the data. Limits timestamp range from 1677-09-21 00:12:43.145224192 to 2262-04-11 23:47:16.854775807.
     :return: Returns the COPY INTO command's results to verify ingestion in the form of a tuple of whether all chunks were
         ingested correctly, # of chunks, # of ingested rows, and ingest's output.
     """
@@ -371,18 +369,13 @@ def to_sql(
         for i, chunk in _chunk_helper(df, 10000000):
             chunk_path = os.path.join(tmp_folder, "file{}.txt".format(i))
             # Dump chunk into parquet file
-            if nanoseconds:
-                chunk.to_parquet(
-                    chunk_path,
-                    engine="pyarrow",
-                    compression="snappy",
-                    index=index,
-                    version="2.6",
-                )
-            else:
-                chunk.to_parquet(
-                    chunk_path, engine="pyarrow", compression="snappy", index=index
-                )
+            chunk.to_parquet(
+                chunk_path,
+                engine="pyarrow",
+                compression="snappy",
+                index=index,
+                version="2.6",
+            )
             # Upload parquet file
             upload_sql = (
                 "PUT /* Python:nuvolos.to_sql() */ "
@@ -402,9 +395,7 @@ def to_sql(
     column_names_and_types = _get_column_names_and_types(
         index=indices, frame=df, dtype_mapper=_get_col_db_type
     )
-    scale = 6
-    if nanoseconds:
-        scale = 9
+    scale = 9
     for col_name, col_type, is_index in column_names_and_types:
         if is_index and indices is not None:
             db_columns.append(_quote_name(col_name))
