@@ -185,13 +185,13 @@ def get_connection_string(username=None, password=None, dbname=None, schemaname=
     masked_connection_string = f"DRIVER=SnowflakeDSIIDriver;SERVER={snowflake_host}.snowflakecomputing.com;DATABASE=%22{quote(db_name)}%22;SCHEMA=%22{quote(schema_name)}%22;UID={username}"
 
     if os.getenv("SNOWFLAKE_RSA_KEY"):
-        connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIVATE_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
-        masked_connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIVATE_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
+        connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIV_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
+        masked_connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIV_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
         if os.getenv("SNOWFLAKE_RSA_KEY_PASSPHRASE"):
             connection_string += (
-                f";PRIVATE_KEY_FILE_PWD={os.getenv('SNOWFLAKE_RSA_KEY_PASSPHRASE')}"
+                f";PRIV_KEY_FILE_PWD={os.getenv('SNOWFLAKE_RSA_KEY_PASSPHRASE')}"
             )
-            masked_connection_string += ";PRIVATE_KEY_FILE_PWD=************"
+            masked_connection_string += ";PRIV_KEY_FILE_PWD=************"
     else:
         connection_string += f";PWD={password}"
         masked_connection_string += ";PWD=************"
