@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools >= 61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nuvolos-odbc"
+dynamic = ["version"]
+description = "The Nuvolos Python library for database connectivity, internal PyODBC-based version"
+readme = "README.md"
+authors = [
+    {name = "Alphacruncher", email = "support@nuvolos.cloud"},
+]
+license = {text = "MIT"}
+urls = {Homepage = "https://github.com/nuvolos-cloud/python-connector-odbc"}
+dependencies = [
+    "keyring",
+    "pyodbc",
+    "pandas<3.0.0",
+    "pyarrow>10.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-runner",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "venv"]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "nuvolos.version.__version__"}
