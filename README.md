@@ -2,6 +2,14 @@
 
 This package allows you to read table data from Nuvolos and upload Pandas dataframes as tables.
 
+## Installation
+
+The PyODBC Python connector is preinstalled in Nuvolos applications, but you can install it with the following command:
+
+```commandline
+pip install --upgrade nuvolos-odbc
+```
+
 ## Loading data to Nuvolos
 
 This package provides a `to_sql` function, which bulk loads a Pandas DataFrame to Nuvolos.

@@ -119,11 +119,20 @@ def dbpath_from_env_vars():
         return None
     return {"db_name": db_name, "schema_name": schema_name}
 
+def get_rsa_private_key():
+    filename = os.getenv("SNOWFLAKE_RSA_KEY", "/secrets/snowflake_rsa_private_key")
+    if not os.path.exists(filename):
+        logger.debug(f"Snowflake RSA private key {filename} does not exist")
+        return None
+    else:
+        return filename
+
 
 def get_connection_string(username=None, password=None, dbname=None, schemaname=None):
+    rsa_private_key = get_rsa_private_key()
     if username is None and password is None:
-        if os.getenv("SNOWFLAKE_RSA_KEY"):
-            username = os.getenv("") or username_from_secrets()
+        if rsa_private_key:
+            username = username_from_secrets()
         else:
             credd = credd_from_env_vars() or credd_from_secrets() or credd_from_local()
             if credd is None:
@@ -133,7 +142,7 @@ def get_connection_string(username=None, password=None, dbname=None, schemaname=
             username = credd["username"]
             password = credd["snowflake_access_token"]
     elif (
-        username is not None and password is None and not os.getenv("SNOWFLAKE_RSA_KEY")
+        username is not None and password is None and not rsa_private_key
     ):
         raise ValueError(
             "You have provided a username but not a password. "
@@ -185,9 +194,10 @@ def get_connection_string(username=None, password=None, dbname=None, schemaname=
     connection_string = f"DRIVER=SnowflakeDSIIDriver;SERVER={snowflake_host}.snowflakecomputing.com;DATABASE=%22{quote(db_name)}%22;SCHEMA=%22{quote(schema_name)}%22;UID={username}"
     masked_connection_string = f"DRIVER=SnowflakeDSIIDriver;SERVER={snowflake_host}.snowflakecomputing.com;DATABASE=%22{quote(db_name)}%22;SCHEMA=%22{quote(schema_name)}%22;UID={username}"
 
-    if os.getenv("SNOWFLAKE_RSA_KEY"):
-        connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIV_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
-        masked_connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIV_KEY_FILE={os.getenv('SNOWFLAKE_RSA_KEY')}"
+    rsa_private_key = get_rsa_private_key()
+    if rsa_private_key:
+        connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIV_KEY_FILE={rsa_private_key}"
+        masked_connection_string += f";AUTHENTICATOR=SNOWFLAKE_JWT;PRIV_KEY_FILE={rsa_private_key}"
         if os.getenv("SNOWFLAKE_RSA_KEY_PASSPHRASE"):
             connection_string += (
                 f";PRIV_KEY_FILE_PWD={os.getenv('SNOWFLAKE_RSA_KEY_PASSPHRASE')}"
